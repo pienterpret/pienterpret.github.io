@@ -1359,7 +1359,11 @@ function markBad(v) {
   try { sessionStorage.setItem('sks-badvoices', JSON.stringify([...BADV])); } catch (e) {}
   loadVoices();
 }
-// rank voices: natural/neural/online/premium/enhanced first; nl-NL before nl-BE; avoid compact/eSpeak voices
+// rank voices: a natural, FEMALE Dutch voice first (this is a game for a little girl: the warm, smooth voices of Claire/Ellen/Fleur/
+// Fenna/Colette/Google Nederlands), enhanced/premium/natural variants before plain ones, nl-NL before nl-BE, male voices (Xander,
+// Maarten...) last, compact/eSpeak voices avoided. A voice that turns out to be broken is skipped (BADV, see markBad).
+const FEMALE_RE = /claire|ellen|fleur|fenna|colette|femke|laura|dena|google|female|vrouw|\bsiri\b.*(female|vrouw)/;
+const MALE_RE = /xander|maarten|arnaud|frank|david|jasper|ruben|\bmale\b|\bman\b/;
 function voiceScore(v) {
   const lang = (v.lang || '').toLowerCase().replace('_', '-'), n = (v.name || '').toLowerCase();
   let s;
@@ -1367,11 +1371,13 @@ function voiceScore(v) {
   if (/natural|neural/.test(n)) s += 60;
   if (/online/.test(n)) s += 45;
   if (/premium|enhanced|verbeterd|plus/.test(n)) s += 50;
-  if (/google/.test(n)) s += IS_CHROME ? 200 : 35;   // Chrome: 'Google Nederlands' works; the macOS system voices (Xander...) can be cancelled at once
-  if (/fenna|colette|maarten|xander|claire|ellen|arnaud|dena|laura|frank/.test(n)) s += 15;
+  if (/google/.test(n)) s += 35;
+  if (/female|vrouw/.test(n) || (FEMALE_RE.test(n) && !MALE_RE.test(n))) s += 60;
+  else if (MALE_RE.test(n)) s -= 80;
   if (/compact|espeak|robot/.test(n)) s -= 60;
   return s;
 }
+const SPEECH_RATE = 0.95, SPEECH_PITCH = 1.0;
 function loadVoices() {
   if (!('speechSynthesis' in window)) return;
   const vs = speechSynthesis.getVoices().filter(v => voiceScore(v) >= 0 && !BADV.has(v.name)).sort((x, y) => voiceScore(y) - voiceScore(x));
@@ -1397,16 +1403,17 @@ function voiceStop() {
     try { if (speechSynthesis.speaking || speechSynthesis.pending || speechSynthesis.paused) { speechSynthesis.cancel(); lastCancel = performance.now(); } } catch (e) {}
   }
 }
-function splitSpeech(text) {
-  const out = [];
+// Split only text that is really long, at sentence boundaries; short sentences stay together in ONE utterance (smoother, no
+// choppy gaps). Remote voices (Google...) are cut off by Chrome after ~15 s, so they get a smaller limit.
+function speechLimit() { return voice && (voice.localService === false || /google|online/i.test(voice.name || '')) ? 140 : 220; }
+function splitSpeech(text, max = speechLimit()) {
+  const out = []; let cur = '';
+  const push = part => { if (cur && (cur + ' ' + part).length > max) { out.push(cur); cur = part; } else cur = cur ? cur + ' ' + part : part; };
   String(text).replace(/\s+/g, ' ').trim().split(/(?<=[.!?])\s+/).forEach(sen => {
-    if (sen.length <= 140) { out.push(sen); return; }
-    let cur = '';
-    sen.split(/(?<=[,;:])\s+/).forEach(part => {
-      if (cur && (cur + ' ' + part).length > 140) { out.push(cur); cur = part; } else cur = cur ? cur + ' ' + part : part;
-    });
-    if (cur) out.push(cur);
+    if (sen.length <= max) { push(sen); return; }
+    sen.split(/(?<=[,;:])\s+/).forEach(push);   // a single very long sentence: split at commas
   });
+  if (cur) out.push(cur);
   return out.filter(Boolean);
 }
 const PAUSE_BETWEEN = 350;     // short breath between two lines
@@ -1442,7 +1449,7 @@ function spChunk(item, tok, retry) {
       const used = voice;
       const u = new SpeechSynthesisUtterance(text);
       u.lang = used ? used.lang : 'nl-NL'; if (used) u.voice = used;
-      u.rate = 0.95; u.pitch = 1.0;
+      u.rate = SPEECH_RATE; u.pitch = SPEECH_PITCH;
       u.onstart = () => { started = true; };
       u.onend = end;
       u.onerror = e => {

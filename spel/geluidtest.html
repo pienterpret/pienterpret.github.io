@@ -22,12 +22,13 @@ const log=m=>{ logEl.textContent=((performance.now()-t0)/1000).toFixed(2)+'s  '+
 let ac=null;
 function info(){
   let v=[]; try{ v=speechSynthesis.getVoices(); }catch(e){}
-  const nl=v.filter(x=>/^nl/i.test(x.lang)).map(x=>x.name+' ('+x.lang+')');
+  let nl=v.filter(x=>/^nl/i.test(x.lang)).map(x=>x.name+' ('+x.lang+')');
+  try{ nl=v.filter(x=>score(x)>=0).sort((a,b)=>score(b)-score(a)).map((x,i)=>(i+1)+'. '+x.name+' ('+x.lang+', '+score(x)+')'); }catch(e){}
   $('info').textContent=
    'Browser: '+navigator.userAgent+'\n'+
    'Adres: '+location.origin+'\n'+
    'AudioContext: '+(window.AudioContext||window.webkitAudioContext?'ja':'NEE')+'   toestand: '+(ac?ac.state:'(nog niet gemaakt)')+'\n'+
-   'Spraak: '+('speechSynthesis' in window?'ja':'NEE')+'   stemmen: '+v.length+'   Nederlandse: '+(nl.join(', ')||'geen')+'\n'+
+   'Spraak: '+('speechSynthesis' in window?'ja':'NEE')+'   stemmen: '+v.length+'   Nederlandse (beste eerst): '+(nl.join(', ')||'geen')+'\n'+
    'Geluid in spel aan/uit (sks-sound): '+(localStorage.getItem('sks-sound')||'(niet gezet = aan)')+'\n'+
    'Tabblad zichtbaar: '+document.visibilityState;
 }
@@ -43,13 +44,16 @@ $('b1').onclick=()=>{ try{
   o.start(); o.stop(ac.currentTime+0.7); log('piep gestart (toestand '+ac.state+'). Hoor je een toon van een halve seconde?');
  }catch(e){ log('FOUT: '+e); } info(); };
 const CHROME=/Chrome\//.test(navigator.userAgent)&&!/Edg\/|OPR\//.test(navigator.userAgent);
+const FEMALE_RE=/claire|ellen|fleur|fenna|colette|femke|laura|dena|google|female|vrouw/, MALE_RE=/xander|maarten|arnaud|frank|david|jasper|ruben|\bmale\b|\bman\b/;
 const score=v=>{ const l=(v.lang||'').toLowerCase().replace('_','-'),n=(v.name||'').toLowerCase(); let s;
   if(l.startsWith('nl-nl'))s=100;else if(l.startsWith('nl-be'))s=80;else if(l.startsWith('nl'))s=70;else return -1;
   if(/natural|neural/.test(n))s+=60; if(/online/.test(n))s+=45; if(/premium|enhanced|verbeterd|plus/.test(n))s+=50;
-  if(/google/.test(n))s+=CHROME?200:35; if(/compact|espeak|robot/.test(n))s-=60; return s; };
+  if(/google/.test(n))s+=35;
+  if(/female|vrouw/.test(n)||(FEMALE_RE.test(n)&&!MALE_RE.test(n)))s+=60; else if(MALE_RE.test(n))s-=80;
+  if(/compact|espeak|robot/.test(n))s-=60; return s; };
 const nlVoices=()=>speechSynthesis.getVoices().filter(v=>score(v)>=0).sort((x,y)=>score(y)-score(x));
 function speakWith(voice,text){ return new Promise(res=>{   // resolves {ok, why}; never rejects
-  const u=new SpeechSynthesisUtterance(text); u.lang=voice?voice.lang:'nl-NL'; if(voice)u.voice=voice; let started=false,done=false;
+  const u=new SpeechSynthesisUtterance(text); u.lang=voice?voice.lang:'nl-NL'; if(voice)u.voice=voice; u.rate=0.95; u.pitch=1.0; let started=false,done=false;
   const fin=r=>{ if(!done){done=true;clearTimeout(tm);res(r);} };
   u.onstart=()=>{started=true;}; u.onend=()=>fin({ok:started||true,why:'klaar'}); u.onerror=e=>fin({ok:false,why:e.error});
   const tm=setTimeout(()=>fin({ok:started,why:started?'klaar (geen einde-melding)':'geen reactie na 6 s'}),6000);
