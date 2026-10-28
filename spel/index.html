@@ -1142,7 +1142,7 @@ const st = { level: 1, idx: 0, stars: 0, results: [], q: null, attempts: 0, busy
 let soundOn = localStorage.getItem('sks-sound') !== 'off';
 
 /* ---------- audio (WebAudio) ---------- */
-let ac = null, master = null, outG = null, duckUntil = 0;
+let ac = null, master = null, outG = null, duckUntil = 0, resumeP = null, resumeAt = 0;
 function ensureAudio() {
   try {
     if (!ac) {
@@ -1150,7 +1150,11 @@ function ensureAudio() {
       outG = ac.createGain(); outG.gain.value = soundOn ? 1 : 0; outG.connect(ac.destination);
       master = ac.createGain(); master.gain.value = 0.5; master.connect(outG);
     }
-    if (ac.state !== 'running') { const r = ac.resume(); if (r && r.catch) r.catch(() => {}); }   // 'suspended' or iOS 'interrupted'
+    if (ac.state !== 'running') {   // 'suspended' (new context in Safari/Firefox, autoplay policy) or iOS 'interrupted'
+      resumeAt = performance.now();
+      const r = ac.resume(); resumeP = r && r.then ? r : null;
+      if (r && r.catch) r.catch(() => {});
+    }
   } catch (e) { ac = null; }
 }
 /* ---- mobile audio unlock (iOS Safari / Chrome / Android) ----
@@ -1164,6 +1168,18 @@ function ensureAudio() {
 try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
 let bufUnlocked = false;
 const live = () => !!ac && soundOn && ac.state === 'running';
+/* resume() is asynchronous: in Safari/Firefox the context is still 'suspended' for a few ms inside the very tap that
+   unlocks it, and the sounds of that tap are requested in the same tick. So a sound that finds the context not yet
+   running waits for THIS tap's resume (at most WAIT_MAX ms) and then plays. Anything older (no resume in flight, the
+   resume took too long, muted meanwhile) is dropped, never queued: a suspended context has a frozen clock and
+   would otherwise play stale sounds in a burst later. */
+const WAIT_MAX = 700;
+function whenLive(fn, dropped) {
+  const t = performance.now();
+  if (ac && soundOn && resumeP && t - resumeAt < WAIT_MAX) {
+    resumeP.then(() => { if (live() && performance.now() - t < WAIT_MAX) fn(); else if (dropped) dropped(); }).catch(() => { if (dropped) dropped(); });
+  } else if (dropped) dropped();
+}
 function unlockAudio() {      // one cheap call per gesture; does real work only on the first tap or when the context is not running
   if (ac && ac.state === 'running' && bufUnlocked) return;
   ensureAudio();
@@ -1172,7 +1188,7 @@ function unlockAudio() {      // one cheap call per gesture; does real work only
   }
 }
 function tone(freq, start, dur, type = 'triangle', vol = 0.25, toFreq) {
-  if (!live()) return;   // never schedule on a suspended context (frozen clock -> burst on resume)
+  if (!live()) { whenLive(() => tone(freq, start, dur, type, vol, toFreq)); return; }   // never schedule on a suspended context (frozen clock -> burst on resume)
   const t0 = ac.currentTime + start;
   const o = ac.createOscillator(), g = ac.createGain();
   o.type = type; o.frequency.setValueAtTime(freq, t0);
@@ -1193,7 +1209,7 @@ const SFX = {
   clipclop(sec, step = 0.3, from = 0) { for (let t = from + 0.1; t < from + sec; t += step) { tone(760, t, 0.05, 'square', 0.045); tone(560, t + step * 0.4, 0.05, 'square', 0.04); } },
   munch(at) { tone(170, at, 0.06, 'square', 0.05); tone(120, at + 0.08, 0.07, 'square', 0.045); tone(150, at + 0.17, 0.05, 'square', 0.03); },
   neigh(at = 0, vol = 1) {   // synthesized whinny
-    if (!live()) return;
+    if (!live()) { whenLive(() => SFX.neigh(at, vol)); return; }
     duck(1.4);
     const t0 = ac.currentTime + at;
     const o = ac.createOscillator(), lfo = ac.createOscillator(), lg = ac.createGain(), bp = ac.createBiquadFilter(), g = ac.createGain();
@@ -1312,7 +1328,7 @@ function musicStop() {
 }
 function musicPlay(mode, onEnd, cfg) {
   ensureAudio(); if (!ac) return;
-  if (!live()) { if (onEnd) setTimeout(onEnd, 0); return; }   // context not running (or muted): don't queue a song that would start late
+  if (!live()) { whenLive(() => musicPlay(mode, onEnd, cfg), () => { if (onEnd) setTimeout(onEnd, 0); }); return; }   // wait for this tap's resume, else give up (never start a song late)
   if (!Music.gain) { Music.gain = ac.createGain(); Music.gain.gain.value = 0; Music.gain.connect(outG); }
   musicStop();
   const r = buildSing(cfg);
@@ -1451,6 +1467,9 @@ function spChunk(item, tok) {
     u.rate = 0.95; u.pitch = 1.0;
     u.onstart = () => { started = true; };
     u.onend = u.onerror = end;
+    // our queue only ever has ONE utterance in the engine, so anything the engine still reports is stale (a line that
+    // never ended, a speak() blocked before the first tap): clear it, or the new line would wait behind it forever
+    if (speechSynthesis.speaking || speechSynthesis.pending) speechSynthesis.cancel();
     if (speechSynthesis.paused) speechSynthesis.resume();   // iOS sometimes leaves the engine paused after cancel()
     speechSynthesis.speak(u);
     // no voice / no events at all: give up on this chunk if nothing ever started
@@ -1471,11 +1490,6 @@ function say(text, opts = {}) {
   // a line is in progress: never cut it off; the newest waiting line replaces an older waiting one
   if (SP.cur || SP.gap) { SP.q.splice(0).forEach(o => { try { o.done(); } catch (e) {} }); }
   SP.q.push(item); spSync();
-  if (opts.interrupt) {   // iOS drops or garbles a speak() issued in the same tick as cancel(): give the engine a moment
-    const tok = SP.tok; SP.gap = true; spSync();
-    SP.timers.push(setTimeout(() => { if (tok === SP.tok) { SP.gap = false; spNext(); } }, 90));
-    return;
-  }
   if (!SP.cur && !SP.gap) spNext();
 }
 window.sksSay = say;
