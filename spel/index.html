@@ -1153,26 +1153,36 @@ function ensureAudio() {
     if (ac.state !== 'running') { const r = ac.resume(); if (r && r.catch) r.catch(() => {}); }   // 'suspended' or iOS 'interrupted'
   } catch (e) { ac = null; }
 }
-/* ---- mobile audio unlock (iOS Safari / Chrome / Android) ----
-   Web Audio only starts inside a real user gesture (iOS wants touchend/click, not touchstart), so the first tap
-   creates + resumes the context and plays a 1-sample silent buffer. After that the handler does nothing unless the
-   context stopped running (iOS can suspend/'interrupt' it): then the next tap resumes it.
-   IMPORTANT: sounds are only ever scheduled while ctx.state === 'running' (see live()). A suspended context has a
-   frozen clock; anything scheduled then would all fire at once on resume ('random sounds when I tap').
-   Trade-off: on an iPhone with the silent (ring) switch ON, Web Audio can be muted by iOS; speech normally still plays.
-   We deliberately do NOT use a silent looping <audio> hack: it changes the iOS audio route and caused glitches/late sounds. */
+/* ---- mobile audio unlock (iOS Safari / Android Chrome) ----
+   Web Audio and speechSynthesis only start inside a real user gesture, and iOS wants touchend/click (not touchstart).
+   The iPhone silent switch mutes Web Audio unless the page is on the 'playback' audio session, or an HTML <audio> element plays. */
 try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
-let bufUnlocked = false;
-const live = () => !!ac && soundOn && ac.state === 'running';
-function unlockAudio() {      // one cheap call per gesture; does real work only on the first tap or when the context is not running
-  if (ac && ac.state === 'running' && bufUnlocked) return;
+const SILENT_WAV = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
+let silentEl = null, speechUnlocked = false, bufUnlocked = false;
+function keepSilentAudio() {   // plays a silent looping <audio>: lifts Web Audio above the iOS silent switch
+  try {
+    if (!silentEl) {
+      silentEl = new Audio(SILENT_WAV); silentEl.loop = true; silentEl.preload = 'auto';
+      silentEl.setAttribute('playsinline', ''); silentEl.setAttribute('aria-hidden', 'true'); silentEl.volume = 1;
+    }
+    if (soundOn && silentEl.paused) { const r = silentEl.play(); if (r && r.catch) r.catch(() => {}); }
+    else if (!soundOn && !silentEl.paused) silentEl.pause();
+  } catch (e) {}
+}
+function unlockAudio() {      // call synchronously from a user gesture; safe to call on every tap
+  try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) {}
   ensureAudio();
-  if (ac && !bufUnlocked) {
+  if (ac && !bufUnlocked) {   // classic unlock: start a 1-sample silent buffer inside the gesture
     try { const b = ac.createBuffer(1, 1, 22050), src = ac.createBufferSource(); src.buffer = b; src.connect(ac.destination); src.start(0); bufUnlocked = true; } catch (e) {}
+  }
+  keepSilentAudio();
+  if (!speechUnlocked && soundOn && 'speechSynthesis' in window) {   // iOS needs a first speak() inside a gesture
+    speechUnlocked = true;
+    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.lang = 'nl-NL'; speechSynthesis.speak(u); } catch (e) {}
   }
 }
 function tone(freq, start, dur, type = 'triangle', vol = 0.25, toFreq) {
-  if (!live()) return;   // never schedule on a suspended context (frozen clock -> burst on resume)
+  if (!ac || !soundOn) return;
   const t0 = ac.currentTime + start;
   const o = ac.createOscillator(), g = ac.createGain();
   o.type = type; o.frequency.setValueAtTime(freq, t0);
@@ -1193,7 +1203,7 @@ const SFX = {
   clipclop(sec, step = 0.3, from = 0) { for (let t = from + 0.1; t < from + sec; t += step) { tone(760, t, 0.05, 'square', 0.045); tone(560, t + step * 0.4, 0.05, 'square', 0.04); } },
   munch(at) { tone(170, at, 0.06, 'square', 0.05); tone(120, at + 0.08, 0.07, 'square', 0.045); tone(150, at + 0.17, 0.05, 'square', 0.03); },
   neigh(at = 0, vol = 1) {   // synthesized whinny
-    if (!live()) return;
+    if (!ac || !soundOn) return;
     duck(1.4);
     const t0 = ac.currentTime + at;
     const o = ac.createOscillator(), lfo = ac.createOscillator(), lg = ac.createGain(), bp = ac.createBiquadFilter(), g = ac.createGain();
@@ -1281,7 +1291,6 @@ function buildSing(cfg) {
 
 const Music = { song: null, gain: null, timer: null, events: [], idx: 0, start: 0, len: 0, loop: false, mode: null, base: 0, cur: -1, nodes: new Set(), onEnd: null };
 function mOsc(type, f, t, dur, vol, attack = 0.008) {
-  if (!live()) return;
   const o = ac.createOscillator(), g = ac.createGain();
   o.type = type; o.frequency.value = f;
   g.gain.setValueAtTime(0.0001, t);
@@ -1312,7 +1321,6 @@ function musicStop() {
 }
 function musicPlay(mode, onEnd, cfg) {
   ensureAudio(); if (!ac) return;
-  if (!live()) { if (onEnd) setTimeout(onEnd, 0); return; }   // context not running (or muted): don't queue a song that would start late
   if (!Music.gain) { Music.gain = ac.createGain(); Music.gain.gain.value = 0; Music.gain.connect(outG); }
   musicStop();
   const r = buildSing(cfg);
@@ -1321,7 +1329,7 @@ function musicPlay(mode, onEnd, cfg) {
   Music.timer = setInterval(musicTick, 40); musicTick();
 }
 function musicTick() {
-  if (!ac || !Music.mode || ac.state !== 'running') return;
+  if (!ac || !Music.mode) return;
   const now = ac.currentTime;
   for (;;) {
     if (Music.idx >= Music.events.length) { if (Music.loop) { Music.start += Music.len; Music.idx = 0; } else break; }
@@ -1338,8 +1346,8 @@ function musicTick() {
 }
 document.addEventListener('visibilitychange', () => {
   if (!ac) return;
-  if (document.hidden) { voiceStop(); ac.suspend(); }
-  else { const r = ac.resume(); if (r && r.catch) r.catch(() => {}); }   // iOS may refuse until the next tap, which unlockAudio() handles
+  if (document.hidden) { if (silentEl) silentEl.pause(); ac.suspend(); }
+  else { const r = ac.resume(); if (r && r.catch) r.catch(() => {}); keepSilentAudio(); }   // iOS may refuse until the next tap, which unlockAudio() handles
 });
 
 /* ---------- songs with original lyrics ---------- */
@@ -1451,7 +1459,6 @@ function spChunk(item, tok) {
     u.rate = 0.95; u.pitch = 1.0;
     u.onstart = () => { started = true; };
     u.onend = u.onerror = end;
-    if (speechSynthesis.paused) speechSynthesis.resume();   // iOS sometimes leaves the engine paused after cancel()
     speechSynthesis.speak(u);
     // no voice / no events at all: give up on this chunk if nothing ever started
     timers.push(setTimeout(() => { if (!started && !speechSynthesis.speaking && !speechSynthesis.pending) end(); }, 2000));
@@ -1471,11 +1478,6 @@ function say(text, opts = {}) {
   // a line is in progress: never cut it off; the newest waiting line replaces an older waiting one
   if (SP.cur || SP.gap) { SP.q.splice(0).forEach(o => { try { o.done(); } catch (e) {} }); }
   SP.q.push(item); spSync();
-  if (opts.interrupt) {   // iOS drops or garbles a speak() issued in the same tick as cancel(): give the engine a moment
-    const tok = SP.tok; SP.gap = true; spSync();
-    SP.timers.push(setTimeout(() => { if (tok === SP.tok) { SP.gap = false; spNext(); } }, 90));
-    return;
-  }
   if (!SP.cur && !SP.gap) spNext();
 }
 window.sksSay = say;
@@ -1919,6 +1921,7 @@ $('hintBtn').addEventListener('click', () => { SFX.tap(); showHint(true); });
 function toggleSound() {
   soundOn = !soundOn; localStorage.setItem('sks-sound', soundOn ? 'on' : 'off');
   ensureAudio();
+  keepSilentAudio();
   if (outG) { outG.gain.cancelScheduledValues(ac.currentTime); outG.gain.setValueAtTime(soundOn ? 1 : 0, ac.currentTime); }
   if (!soundOn) { voiceStop(); try { speechSynthesis.cancel(); } catch (e) {} }
   updateSoundIcon();
@@ -1927,7 +1930,7 @@ function toggleSound() {
 $('soundBtn').addEventListener('click', toggleSound);
 $('soundBtnStart').addEventListener('click', e => { e.stopPropagation(); toggleSound(); });
 // unlock on every kind of gesture, and again on each tap while the context is not running (iOS may suspend it any time)
-['touchend', 'click', 'keydown'].forEach(t => document.addEventListener(t, unlockAudio, { capture: true, passive: true }));
+['touchend', 'pointerup', 'click', 'keydown'].forEach(t => document.addEventListener(t, () => { unlockAudio(); }, { capture: true, passive: true }));
 // scale caps up on large screens (digibord, 4K); phones/tablets stay at --z = 1
 function fitScale() {
   const z = Math.max(1, Math.min(innerWidth / 1440, innerHeight / 900, 3));
@@ -1953,7 +1956,7 @@ $('flags').innerHTML = Array.from({ length: 16 }, (_, i) => { const x = i * 38 +
 // test hook
 window.__splits = { makeQuestion, checkAnswer, adapt, LEVELS, STOOMBOOT, state: st, get prog() { return prog; },
   music: Music, startRound, tumble, ozosnel, OZO, FEEST, SONG_FEEST, startCel, stopCel, endRound, songBeats, questionText, cancelGame, get pendingTimers() { return gameTimers.size; }, INSTRUCTION, fitScale, get voice() { return voice; }, voiceScore,
-  get soundOn() { return soundOn; }, get unlock() { return { state: ac && ac.state, bufUnlocked }; }, SFX, get ac() { return ac; }, get outG() { return outG; },
+  get soundOn() { return soundOn; }, get unlock() { return { state: ac && ac.state, silentPlaying: !!(silentEl && !silentEl.paused), speechUnlocked, bufUnlocked }; }, get ac() { return ac; }, get outG() { return outG; },
   speech: { get active() { return vActive; } } };
 })();
 </script>
