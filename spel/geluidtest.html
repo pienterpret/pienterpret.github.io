@@ -13,6 +13,7 @@ h1{font-size:22px}
 <button id="b1">1. Piep (WebAudio)</button>
 <button id="b2">2. Spraak</button>
 <button id="b3">3. Piep (audio-element)</button>
+<button id="b4">4. Alle Nederlandse stemmen testen</button>
 <pre id="info"></pre>
 <pre id="log"></pre>
 <script>
@@ -41,11 +42,31 @@ $('b1').onclick=()=>{ try{
   g.gain.setValueAtTime(0.0001,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.4,ac.currentTime+0.02); g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+0.6);
   o.start(); o.stop(ac.currentTime+0.7); log('piep gestart (toestand '+ac.state+'). Hoor je een toon van een halve seconde?');
  }catch(e){ log('FOUT: '+e); } info(); };
-$('b2').onclick=()=>{ try{
-  const u=new SpeechSynthesisUtterance('Hallo! Dit is een test van de stem.'); u.lang='nl-NL';
-  const nl=speechSynthesis.getVoices().find(v=>/^nl/i.test(v.lang)); if(nl) u.voice=nl;
-  u.onstart=()=>log('spraak: begonnen'); u.onend=()=>log('spraak: klaar'); u.onerror=e=>log('spraak: FOUT '+e.error);
-  speechSynthesis.cancel(); speechSynthesis.speak(u); log('spraak aangevraagd (stem: '+(nl?nl.name:'standaard')+')');
+const CHROME=/Chrome\//.test(navigator.userAgent)&&!/Edg\/|OPR\//.test(navigator.userAgent);
+const score=v=>{ const l=(v.lang||'').toLowerCase().replace('_','-'),n=(v.name||'').toLowerCase(); let s;
+  if(l.startsWith('nl-nl'))s=100;else if(l.startsWith('nl-be'))s=80;else if(l.startsWith('nl'))s=70;else return -1;
+  if(/natural|neural/.test(n))s+=60; if(/online/.test(n))s+=45; if(/premium|enhanced|verbeterd|plus/.test(n))s+=50;
+  if(/google/.test(n))s+=CHROME?200:35; if(/compact|espeak|robot/.test(n))s-=60; return s; };
+const nlVoices=()=>speechSynthesis.getVoices().filter(v=>score(v)>=0).sort((x,y)=>score(y)-score(x));
+function speakWith(voice,text){ return new Promise(res=>{   // resolves {ok, why}; never rejects
+  const u=new SpeechSynthesisUtterance(text); u.lang=voice?voice.lang:'nl-NL'; if(voice)u.voice=voice; let started=false,done=false;
+  const fin=r=>{ if(!done){done=true;clearTimeout(tm);res(r);} };
+  u.onstart=()=>{started=true;}; u.onend=()=>fin({ok:started||true,why:'klaar'}); u.onerror=e=>fin({ok:false,why:e.error});
+  const tm=setTimeout(()=>fin({ok:started,why:started?'klaar (geen einde-melding)':'geen reactie na 6 s'}),6000);
+  speechSynthesis.speak(u); }); }
+// 2: spreek met de beste stem; mislukt die direct, probeer de volgende (zoals het spel zelf doet)
+$('b2').onclick=async()=>{ try{
+  if(speechSynthesis.speaking||speechSynthesis.pending){ speechSynthesis.cancel(); await new Promise(r=>setTimeout(r,200)); }
+  const list=nlVoices(); const tryList=list.concat([null]);
+  for(const v of tryList){ const nm=v?v.name:'(alleen taal nl-NL)'; log('probeer stem: '+nm+' …');
+    const r=await speakWith(v,'Hallo! Dit is een test van de stem.'); log('stem '+nm+': '+(r.ok?'GELUKT':'MISLUKT')+' ('+r.why+')');
+    if(r.ok){ log('>>> Deze stem werkt: '+nm); break; } }
+ }catch(e){ log('FOUT: '+e); } info(); };
+// 4: alle Nederlandse stemmen één voor één
+$('b4').onclick=async()=>{ try{
+  if(speechSynthesis.speaking||speechSynthesis.pending){ speechSynthesis.cancel(); await new Promise(r=>setTimeout(r,200)); }
+  for(const v of nlVoices()){ const r=await speakWith(v,'Dit is '+v.name.split(' ')[0]+'.'); log('stem '+v.name+' ('+v.lang+'): '+(r.ok?'GELUKT':'MISLUKT')+' ('+r.why+')'); await new Promise(r=>setTimeout(r,300)); }
+  log('klaar met alle stemmen');
  }catch(e){ log('FOUT: '+e); } info(); };
 $('b3').onclick=()=>{ try{
   // 0,5 s sinus 660 Hz als WAV

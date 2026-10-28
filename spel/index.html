@@ -1350,7 +1350,15 @@ function startSong(cfg, onEnd) {
 }
 
 /* ---------- speech: browser speechSynthesis, most natural Dutch voice available ---------- */
-let vActive = false, voice = null;
+let vActive = false, voice = null, lastCancel = -1e9;
+const IS_CHROME = /Chrome\//.test(navigator.userAgent) && !/Edg\/|OPR\//.test(navigator.userAgent);
+// voices that failed in this browser session (e.g. a macOS voice that Chrome cancels at once): skipped from then on
+const BADV = (() => { try { return new Set(JSON.parse(sessionStorage.getItem('sks-badvoices') || '[]')); } catch (e) { return new Set(); } })();
+function markBad(v) {
+  if (!v) return; BADV.add(v.name);
+  try { sessionStorage.setItem('sks-badvoices', JSON.stringify([...BADV])); } catch (e) {}
+  loadVoices();
+}
 // rank voices: natural/neural/online/premium/enhanced first; nl-NL before nl-BE; avoid compact/eSpeak voices
 function voiceScore(v) {
   const lang = (v.lang || '').toLowerCase().replace('_', '-'), n = (v.name || '').toLowerCase();
@@ -1359,15 +1367,15 @@ function voiceScore(v) {
   if (/natural|neural/.test(n)) s += 60;
   if (/online/.test(n)) s += 45;
   if (/premium|enhanced|verbeterd|plus/.test(n)) s += 50;
-  if (/google/.test(n)) s += 35;
+  if (/google/.test(n)) s += IS_CHROME ? 200 : 35;   // Chrome: 'Google Nederlands' works; the macOS system voices (Xander...) can be cancelled at once
   if (/fenna|colette|maarten|xander|claire|ellen|arnaud|dena|laura|frank/.test(n)) s += 15;
   if (/compact|espeak|robot/.test(n)) s -= 60;
   return s;
 }
 function loadVoices() {
   if (!('speechSynthesis' in window)) return;
-  const vs = speechSynthesis.getVoices().filter(v => voiceScore(v) >= 0).sort((x, y) => voiceScore(y) - voiceScore(x));
-  if (vs.length) voice = vs[0];
+  const vs = speechSynthesis.getVoices().filter(v => voiceScore(v) >= 0 && !BADV.has(v.name)).sort((x, y) => voiceScore(y) - voiceScore(x));
+  voice = vs.length ? vs[0] : null;   // none left: speak with the language only
 }
 if ('speechSynthesis' in window) {
   loadVoices();
@@ -1385,7 +1393,9 @@ function spSync() { vActive = voiceBusy(); }
 function spClear() { SP.timers.forEach(clearTimeout); SP.timers = []; }
 function voiceStop() {
   SP.tok++; SP.cur = null; SP.q.length = 0; SP.gap = false; spClear(); spSync();
-  if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
+  if ('speechSynthesis' in window) {
+    try { if (speechSynthesis.speaking || speechSynthesis.pending || speechSynthesis.paused) { speechSynthesis.cancel(); lastCancel = performance.now(); } } catch (e) {}
+  }
 }
 function splitSpeech(text) {
   const out = [];
@@ -1414,26 +1424,52 @@ function spFinish(item, tok) {
   if (SP.q.length) SP.timers.push(setTimeout(() => { if (tok === SP.tok) { SP.gap = false; spNext(); } }, PAUSE_BETWEEN));
   else { SP.gap = false; spSync(); }
 }
-function spChunk(item, tok) {
+const CANCEL_GAP = 160;   // Chrome on macOS can cancel a speak() that follows a cancel() too closely
+function spChunk(item, tok, retry) {
   if (tok !== SP.tok || SP.cur !== item) return;
-  if (item.i >= item.chunks.length) { spFinish(item, tok); return; }
-  const text = item.chunks[item.i++];
-  let ended = false, started = false, timers = [];
-  const end = () => { if (ended) return; ended = true; timers.forEach(clearTimeout); if (tok === SP.tok && SP.cur === item) spChunk(item, tok); };
-  try {
-    if (!voice) loadVoices();
-    const u = new SpeechSynthesisUtterance(text);
-    u.lang = voice ? voice.lang : 'nl-NL'; if (voice) u.voice = voice;
-    u.rate = 0.95; u.pitch = 1.0;
-    u.onstart = () => { started = true; };
-    u.onend = u.onerror = end;
-    speechSynthesis.speak(u);
-    // no voice / no events at all: give up on this chunk if nothing ever started
-    timers.push(setTimeout(() => { if (!started && !speechSynthesis.speaking && !speechSynthesis.pending) end(); }, 2000));
-    // onend never fired (iOS/Chrome): safety timeout scaled to the text length
-    timers.push(setTimeout(end, 3000 + text.length * 140));
-    SP.timers.push(...timers);
-  } catch (e) { end(); }
+  let text, tries = 0;
+  if (retry) { text = retry.text; tries = retry.tries; }
+  else { if (item.i >= item.chunks.length) { spFinish(item, tok); return; } text = item.chunks[item.i++]; }
+  let ended = false, started = false; const timers = [];
+  const t0 = performance.now();
+  const stale = () => tok !== SP.tok || SP.cur !== item;
+  const end = () => { if (ended) return; ended = true; timers.forEach(clearTimeout); if (!stale()) spChunk(item, tok); };
+  const later = (fn, ms) => { const t = setTimeout(fn, ms); timers.push(t); SP.timers.push(t); };
+  const go = () => {
+    if (ended || stale()) return;
+    try {
+      if (!voice) loadVoices();
+      const used = voice;
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = used ? used.lang : 'nl-NL'; if (used) u.voice = used;
+      u.rate = 0.95; u.pitch = 1.0;
+      u.onstart = () => { started = true; };
+      u.onend = end;
+      u.onerror = e => {
+        if (ended) return;
+        if (stale()) { end(); return; }   // our own deliberate cancel: nothing to repair
+        const err = (e && e.error) || '';
+        // died at once, never started, and not because we cancelled: this voice is broken here. Try the next one.
+        if (!started && performance.now() - t0 < 1500 && tries < 3 &&
+            /^(cancel+ed|synthesis-failed|synthesis-unavailable|voice-unavailable|language-unavailable)$/.test(err)) {
+          ended = true; timers.forEach(clearTimeout);
+          if (!used) { spChunk(item, tok, { text, tries: 99 }); return; }   // even the plain language voice failed: give up on this chunk
+          if (performance.now() - lastCancel > 600 || tries > 0) markBad(used);   // (a cancel just before may be the cause: retry the same voice once)
+          const t = setTimeout(() => spChunk(item, tok, { text, tries: tries + 1 }), 200); SP.timers.push(t);
+          return;
+        }
+        end();
+      };
+      speechSynthesis.speak(u);
+      // no voice / no events at all: give up on this chunk if nothing ever started
+      later(() => { if (!started && !speechSynthesis.speaking && !speechSynthesis.pending) end(); }, 2000);
+      // onend never fired (iOS/Chrome): safety timeout scaled to the text length
+      later(end, 3000 + text.length * 140);
+    } catch (e) { end(); }
+  };
+  if (retry && retry.tries >= 99) { end(); return; }
+  const since = performance.now() - lastCancel;
+  if (since < CANCEL_GAP) later(go, CANCEL_GAP - since + 5); else go();
 }
 // say one line. opts: { interrupt: stop whatever is being said first (deliberate user action), done: callback after the last word }
 function say(text, opts = {}) {
