@@ -188,12 +188,6 @@ svg{display:block}
 .syl{display:inline-block;border-radius:7px;transition:transform .12s,color .12s,background .12s}
 .syl.done{color:var(--red-d)}
 .syl.on{color:#fff;background:var(--red);transform:scale(1.12);padding:0 .06em}
-.lyr-foot{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:6px}
-.vdots{display:flex;gap:6px}
-.vdot{width:clamp(30px,4.4vmin,calc(40px*var(--z)));height:clamp(30px,4.4vmin,calc(40px*var(--z)));border-radius:50%;background:#f3dfb1;color:var(--ink);font-weight:800;font-size:clamp(14px,2.2vmin,calc(19px*var(--z)));padding-top:.1em}
-.vdot.on{background:var(--red);color:var(--gold)}
-.sing-btn{font-size:clamp(18px,2.9vmin,calc(28px*var(--z)));padding:.25em .9em .2em}
-.sing-btn svg{width:1em;height:1em}
 .levels .big-btn{position:relative}
 .levels .big-btn.locked{filter:grayscale(.85) brightness(.85);box-shadow:0 6px 0 #6b5a3a,0 10px 20px rgba(0,0,0,.3)}
 .levels .lock{width:.6em;height:.6em;margin-top:4px}
@@ -472,8 +466,6 @@ body.theme-snoep .round-btn{width:clamp(56px,7.4vmin,66px);height:clamp(56px,7.4
 body.theme-snoep .lyrics{background:#fff;color:#3b0d1c;border:5px solid #e8203a;box-shadow:0 7px 0 #9e0f24,0 14px 24px rgba(158,15,36,.2)}
 body.theme-snoep .lyrics .line.cur{background:#ffe3ea}
 body.theme-snoep .syl.on{background:#e8203a}
-body.theme-snoep .vdot{background:#ffe3ea;color:#3b0d1c}
-body.theme-snoep .vdot.on{background:#e8203a;color:#fff}
 body.theme-snoep /* candy-cane split house */
 .house{filter:drop-shadow(0 8px 0 rgba(158,15,36,.25))}
 body.theme-snoep .roof,body.theme-snoep .rooms{background:repeating-linear-gradient(-45deg,#e8203a 0 14px,#fff 14px 28px)}
@@ -612,8 +604,6 @@ body.theme-boot .round-btn{width:clamp(56px,7.4vmin,66px);height:clamp(56px,7.4v
 body.theme-boot .lyrics{background:linear-gradient(#fffdf7,#eef3ff);color:#13234f;border-color:#f5c542;box-shadow:0 7px 0 #8f6a0e,0 14px 30px rgba(0,0,20,.5)}
 body.theme-boot .lyrics h3{color:#c8102e}
 body.theme-boot .lyrics .line.cur{background:#ffe9a0}
-body.theme-boot .vdot{background:#dfe6f7;color:#13234f}
-body.theme-boot .vdot.on{background:#13234f;color:#f5c542}
 body.theme-boot /* canal-house (trapgevel) split house */
 .roof,body.theme-boot .roof-in{clip-path:polygon(0 100%, 0 52%, 12% 52%, 12% 34%, 25% 34%, 25% 16%, 38% 16%, 38% 0, 62% 0, 62% 16%, 75% 16%, 75% 34%, 88% 34%, 88% 52%, 100% 52%, 100% 100%)}
 body.theme-boot .roof{background:linear-gradient(#ffe07a,#e3a922);padding:8px 8px 0}
@@ -827,7 +817,6 @@ input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:d
     <symbol id="ic-home" viewBox="0 0 24 24"><path d="M3 11.5 12 4l9 7.5" stroke="#5a1410" stroke-width="2.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M6 10.5V20h4.5v-5h3v5H18v-9.5" fill="#5a1410"/></symbol>
     <symbol id="ic-sun" viewBox="0 0 40 40"><g stroke="#ffd23f" stroke-width="3" stroke-linecap="round"><path d="M20 2v5M20 33v5M2 20h5M33 20h5M7 7l3.5 3.5M29.5 29.5 33 33M7 33l3.5-3.5M29.5 10.5 33 7"/></g><circle cx="20" cy="20" r="9" fill="#ffd23f"/></symbol>
     <symbol id="ic-nl" viewBox="0 0 40 44"><path d="M6 4v40" stroke="#5a3a22" stroke-width="3"/><rect x="7" y="4" width="30" height="7" fill="#ae1c28"/><rect x="7" y="11" width="30" height="7" fill="#fff"/><rect x="7" y="18" width="30" height="7" fill="#21468b"/></symbol>
-    <symbol id="ic-music" viewBox="0 0 24 24"><path d="M9 17.5V6.2l11-2.4v11.2" stroke="#5a1410" stroke-width="2.4" fill="none" stroke-linejoin="round"/><ellipse cx="6.6" cy="17.6" rx="3.2" ry="2.6" fill="#5a1410"/><ellipse cx="17.6" cy="15.2" rx="3.2" ry="2.6" fill="#5a1410"/></symbol>
     <symbol id="ic-lock" viewBox="0 0 24 24"><path d="M7 11V8a5 5 0 0 1 10 0v3" stroke="#5a1410" stroke-width="2.6" fill="none"/><rect x="4.5" y="10.5" width="15" height="11" rx="2.5" fill="#5a1410"/><circle cx="12" cy="15.5" r="1.8" fill="#f5c542"/></symbol>
     <symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 4.5v15l12-7.5z" fill="#5a1410"/></symbol>
     <symbol id="ic-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" fill="#5a1410"/></symbol>
@@ -887,7 +876,6 @@ input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:d
   <div class="corner-l"><button class="name-chip" id="nameChip" aria-label="Naam invullen of veranderen"><svg viewBox="0 0 24 24"><use href="#ic-pencil" width="24" height="24"/></svg><span id="nameChipTxt">Wie ben jij?</span></button></div>
   <div class="corner">
     <button class="snd-pill" id="soundBtnStart" aria-label="Alle geluid aan of uit"><svg viewBox="0 0 24 24"><use id="soundIconStart" href="#ic-speaker" width="24" height="24"/></svg><span class="lbl" id="soundLbl">Geluid aan</span></button>
-    <button class="round-btn" id="musicBtnStart" aria-label="Muziek aan of uit"><svg viewBox="0 0 24 24"><use href="#ic-music" width="24" height="24"/></svg></button>
   </div>
   <h1 class="title"><span class="t1">Sinterklaas</span><span class="t2">Splitsen</span></h1>
   <div class="start-main">
@@ -933,7 +921,6 @@ input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:d
       <svg class="sint" viewBox="0 0 200 270"><use href="#sint" width="200" height="270"/></svg>
       <svg class="shoe" viewBox="0 0 120 110"><use href="#shoe" width="120" height="110"/></svg>
     </div>
-    <button class="big-btn sing-btn" id="singBtn"><svg viewBox="0 0 24 24"><use id="singIcon" href="#ic-play" width="24" height="24"/></svg><span id="singLabel">Speel het Splitslied</span></button>
   </div>
   <div class="levels">
     <button class="big-btn" id="lv1" data-lv="1"><span class="lv-label">Spelen</span>tot 5<span class="lv-stars"></span></button>
@@ -961,7 +948,6 @@ input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:d
       <div class="dots" id="dots"></div>
       <svg class="boat" id="boatEl" viewBox="0 0 150 100"><use href="#boat" width="150" height="100"/></svg>
     </div>
-    <button class="round-btn" id="musicBtn" aria-label="Muziek aan of uit"><svg viewBox="0 0 24 24"><use href="#ic-music" width="24" height="24"/></svg></button>
     <button class="round-btn" id="soundBtn" aria-label="Geluid en voorlezen aan of uit"><svg viewBox="0 0 24 24"><use id="soundIcon" href="#ic-speaker" width="24" height="24"/></svg></button>
   </div>
   <div class="stage">
@@ -1154,7 +1140,6 @@ function adapt(level, curMax, s, attempts) {
 /* ---------- state ---------- */
 const st = { level: 1, idx: 0, stars: 0, results: [], q: null, attempts: 0, busy: false, hint: false, streak: 0, miss: 0 };
 let soundOn = localStorage.getItem('sks-sound') !== 'off';
-let musicOn = localStorage.getItem('sks-music') !== 'off';
 
 /* ---------- audio (WebAudio) ---------- */
 let ac = null, master = null, outG = null, duckUntil = 0;
@@ -1222,13 +1207,6 @@ const SFX = {
 
 /* ---------- music: traditional melodies, WebAudio arrangement ---------- */
 // MIDI numbers: C4 = 60. Notes: [midi, beats, syllable index in line (-1 = held over from previous syllable)]
-const L6 = a => a.map((n, i) => [n[0], n[1], i]);
-// 'Sinterklaas kapoentje' (traditional, 1851), 4/4
-const KAPOENTJE = { bpm: 100, meter: 4, lines: [
-  { mel: L6([[67,1],[67,1],[69,1],[69,1],[67,2],[64,2]]), chords: [[48,'M',8]] },          // Sin-ter-klaas ka-poen-tje
-  { mel: L6([[67,1],[67,1],[69,1],[69,1],[67,2],[64,2]]), chords: [[48,'M',8]] },          // Gooi wat in mijn schoen-tje
-  { mel: L6([[65,1],[65,1],[65,1],[62,1],[65,2],[65,2]]), chords: [[43,'7',8]] },          // Gooi wat in mijn laars-je
-  { mel: L6([[69,1],[67,1],[65,1],[64,1],[62,2],[60,2]]), chords: [[53,'M',2],[48,'M',2],[43,'7',2],[48,'M',2]] } ] };
 // 'Zie ginds komt de stoomboot' (traditional, 19th c.), waltz 3/4; each line = pickup + 3 bars + long note (12 beats)
 const STOOMBOOT = { bpm: 150, meter: 3, lines: [
   { mel: [[67,1,0],[72,1,1],[72,1,2],[76,1,3],[74,1,4],[74,1,5],[77,1,6],[71,1,7],[71,1,8],[74,1,9],[72,2,10]],
@@ -1274,12 +1252,6 @@ function vamp(song, off, ev, beats) {
   const spb = 60 / song.bpm;
   return off + renderChords([[48, 'M', beats]], song.meter, off, spb, ev) * spb;
 }
-function buildBg() {
-  const ev = []; let off = 0;
-  off = renderSong(KAPOENTJE, off, ev) + 1.2;
-  off = renderSong(STOOMBOOT, off, ev) + 1.2;
-  return { events: ev.sort((a, b) => a.t - b.t), len: off };
-}
 function buildSing(cfg) {
   const ev = []; let off = vamp(cfg.song, 0, ev, cfg.song.meter === 3 ? 6 : 4);
   for (let v = 0; v < cfg.verses; v++) {
@@ -1323,9 +1295,9 @@ function musicPlay(mode, onEnd, cfg) {
   ensureAudio(); if (!ac) return;
   if (!Music.gain) { Music.gain = ac.createGain(); Music.gain.gain.value = 0; Music.gain.connect(outG); }
   musicStop();
-  const r = mode === 'sing' ? buildSing(cfg) : buildBg();
-  Object.assign(Music, { song: cfg || null, events: r.events, len: r.len, idx: 0, start: ac.currentTime + 0.2, loop: mode === 'bg', mode,
-    base: mode === 'sing' ? 0.34 : 0.11, onEnd: onEnd || null });
+  const r = buildSing(cfg);
+  Object.assign(Music, { song: cfg || null, events: r.events, len: r.len, idx: 0, start: ac.currentTime + 0.2, loop: false, mode,
+    base: 0.34, onEnd: onEnd || null });
   Music.timer = setInterval(musicTick, 40); musicTick();
 }
 function musicTick() {
@@ -1340,20 +1312,13 @@ function musicTick() {
   }
   // duck while Sint/Piet is talking and during the big sounds
   const speaking = vActive || ('speechSynthesis' in window && (speechSynthesis.speaking || speechSynthesis.pending));
-  const target = Music.base * ((speaking || now < duckUntil) ? (Music.mode === 'bg' ? 0.25 : 0.5) : 1);
+  const target = Music.base * ((speaking || now < duckUntil) ? 0.5 : 1);
   if (Math.abs(target - Music.cur) > 1e-4) { Music.gain.gain.setTargetAtTime(target, now, Music.cur < 0 ? 0.4 : 0.12); Music.cur = target; }
   if (!Music.loop && Music.idx >= Music.events.length && now > Music.start + Music.len) { const cb = Music.onEnd; musicStop(); if (cb) cb(); }
 }
-function bgMusic() { if (musicOn && Music.mode !== 'sing') { if (Music.mode !== 'bg') musicPlay('bg'); } else if (!musicOn && Music.mode === 'bg') musicStop(); }
 document.addEventListener('visibilitychange', () => { if (!ac) return; document.hidden ? ac.suspend() : ac.resume(); });
 
 /* ---------- songs with original lyrics ---------- */
-// Het Splitslied — melody 'Sinterklaas kapoentje' (6 syllables per line)
-const LYRICS = [
-  [['Tien ','zijn ','pe','per','no','ten,'], ['in ','een ','zak ','ge','slo','ten.'], ['Vier ','en ','zes, ','wat ','lek','ker,'], ['tien ','van ','Sint ','de ','bak','ker!']],
-  [['Vijf ','ca','deau','tjes, ','mooi','e,'], ['met ','een ','strik, ','een ','rooi','e.'], ['Twee ','en ','drie, ','hoe','ra, ','hoor!'], ['Vijf! ','Zo ','zingt ','het ','koor, ','hoor.']],
-  [['Wor','tels ','in ','mijn ','schoen','tje,'], ['acht ','voor ’t ','paard, ','ka','poen','tje.'], ['Vijf ','en ','drie, ','hap ','hap ','hap,'], ['acht! ','Wat ','is ','dat ','knap, ','knap!']],
-];
 // Het Feestlied — melody 'Zie ginds komt de stoomboot' (11 / 12 / 11 / 11 syllables)
 const FEEST = [
   [['Hoor, ','toe','ters ','en ','bel','len, ','de ','boot ','is ','al ','daar!'],
@@ -1369,35 +1334,19 @@ const FEEST = [
    ['De ','Pie','ten ','die ','dan','sen, ','de ','toe','ter ','gaat ','toet!'],
    ['Hoe ','zin','gen ','wij ','sa','men: ','dat ','deed ','jij ','heel ','goed!']],
 ];
-const SONG_SPLITS = { id: 'a', song: KAPOENTJE, lyrics: LYRICS, verseEl: 'verse', dotsEl: 'vdots', verses: 3 };
 const SONG_FEEST = { id: 'b', song: STOOMBOOT, lyrics: FEEST, verseEl: 'cverse', dotsEl: null, verses: 2 };
-const kState = { a: { shown: -1, cur: '' }, b: { shown: -1, cur: '' } };
+const kState = { b: { shown: -1, cur: '' } };
 
 function renderVerse(cfg, v) {
   kState[cfg.id].shown = v;
   if (!$(cfg.verseEl)) return;   // lyrics are not shown on screen any more
   $(cfg.verseEl).innerHTML = cfg.lyrics[v].map((line, l) => `<div class="line" data-l="${l}">` +
     line.map((s, k) => `<span class="syl" data-l="${l}" data-k="${k}">${s.trimEnd()}</span>${/\s$/.test(s) ? ' ' : ''}`).join('') + '</div>').join('');
-  if (cfg.dotsEl) [...$(cfg.dotsEl).children].forEach((d, i) => d.classList.toggle('on', i === v));
-}
-function initLyrics() {
-  renderVerse(SONG_SPLITS, 0); renderVerse(SONG_FEEST, 0);
-}
-function singUI(playing) {
-  $('singIcon').setAttribute('href', playing ? '#ic-stop' : '#ic-play');
-  $('singLabel').textContent = playing ? 'Stop de muziek' : 'Speel het Splitslied';
-  if (!playing) { kState.a.cur = ''; renderVerse(SONG_SPLITS, 0); }
 }
 function startSong(cfg, onEnd) {
   voiceStop();
   kState[cfg.id].cur = ''; renderVerse(cfg, 0);
   musicPlay('sing', onEnd, cfg);
-}
-function toggleSing() {
-  ensureAudio(); if (!ac) return;
-  if (Music.mode === 'sing') { musicStop(); singUI(false); bgMusic(); return; }
-  startSong(SONG_SPLITS, () => { singUI(false); bgMusic(); });
-  singUI(true);
 }
 
 /* ---------- speech: browser speechSynthesis, most natural Dutch voice available ---------- */
@@ -1820,7 +1769,7 @@ function endRound() {
   const tok = ++celToken;
   later(() => {
     if (tok !== celToken) return;
-    say(txt, { done: () => { later(() => { if (tok === celToken && soundOn && musicOn && $('end').classList.contains('active')) startCel(); }, 500); } });
+    say(txt, { done: () => { later(() => { if (tok === celToken && soundOn && $('end').classList.contains('active')) startCel(); }, 500); } });
   }, 1700);
 }
 function celUI(playing) {
@@ -1848,8 +1797,7 @@ function startRound(level) {
   if (level > prog.unlocked) return;
   cancelGame();
   ensureAudio(); SFX.tap();
-  if (Music.mode === 'sing') { musicStop(); singUI(false); }
-  bgMusic();
+  if (Music.mode) musicStop();
   st.level = level; st.idx = 0; st.stars = 0; st.results = []; st.q = null; st.streak = 0; st.miss = 0;
   if (window.skWorld) window.skWorld(level);   // COMBI HOOK: pick this level's world (theme class on <body>)
   localStorage.setItem('sks-level', level);
@@ -1891,11 +1839,6 @@ function updateSoundIcon() {
   $('soundLbl').textContent = soundOn ? 'Geluid aan' : 'Geluid uit';
   $('soundBtn').setAttribute('aria-pressed', String(!soundOn)); $('soundBtnStart').setAttribute('aria-pressed', String(!soundOn));
 }
-function updateMusicIcon() { ['musicBtn', 'musicBtnStart'].forEach(id => $(id).classList.toggle('off', !musicOn)); }
-function toggleMusic() {
-  musicOn = !musicOn; localStorage.setItem('sks-music', musicOn ? 'on' : 'off');
-  ensureAudio(); updateMusicIcon(); bgMusic();
-}
 
 
 /* ---------- naam van het kind: alleen in localStorage op dit apparaat, wordt nergens heen gestuurd ---------- */
@@ -1935,7 +1878,7 @@ if (!localStorage.getItem('sks-named')) openName('start');
 [1, 2, 3].forEach(lv => $('lv' + lv).addEventListener('click', () => levelClick(lv)));
 $('againBtn').addEventListener('click', () => { leaveEnd(); startRound(st.level); });
 $('singAgainBtn').addEventListener('click', () => { ensureAudio(); voiceStop(); startCel(); });
-$('skipBtn').addEventListener('click', () => { stopCel(); bgMusic(); });
+$('skipBtn').addEventListener('click', () => { stopCel(); });
 $('otherBtn').addEventListener('click', () => {
   leaveEnd(); const g = $('otherBtn').dataset.go;
   if (g && g !== 'menu') startRound(+g); else { renderStart(); show('start'); }
@@ -1953,13 +1896,10 @@ function toggleSound() {
 }
 $('soundBtn').addEventListener('click', toggleSound);
 $('soundBtnStart').addEventListener('click', e => { e.stopPropagation(); toggleSound(); });
-$('musicBtn').addEventListener('click', toggleMusic);
-$('musicBtnStart').addEventListener('click', e => { e.stopPropagation(); toggleMusic(); });
-$('singBtn').addEventListener('click', e => { e.stopPropagation(); toggleSing(); });
-// background music may only start after the first tap (autoplay rules)
+// the audio context may only start after the first tap (autoplay rules)
 let firstGesture = true;
 const onFirst = e => {
-  if (!firstGesture) return; firstGesture = false; ensureAudio(); setTimeout(bgMusic, 0);
+  if (!firstGesture) return; firstGesture = false; ensureAudio();
 };
 document.addEventListener('pointerdown', onFirst, true);
 document.addEventListener('keydown', onFirst, true);
@@ -1980,14 +1920,14 @@ addEventListener('keydown', e => {
     if (btn) onAnswer(n, btn);
   }
 });
-updateSoundIcon(); updateMusicIcon(); renderStart(); initLyrics();
+updateSoundIcon(); renderStart(); renderVerse(SONG_FEEST, 0);
 $('danceHorse').innerHTML = horseSVG('sint');
 $('flags').innerHTML = Array.from({ length: 16 }, (_, i) => { const x = i * 38 + 6, y = 8 + 32 * Math.sin(Math.PI * (x + 12) / 600) * 0.95;
   return `<path d="M${x} ${y} l24 0 l-12 22z" fill="${['#c8102e', '#ffffff', '#21468b', '#f5c542'][i % 4]}"/>`; }).join('');
 
 // test hook
-window.__splits = { makeQuestion, checkAnswer, adapt, LEVELS, LYRICS, KAPOENTJE, STOOMBOOT, state: st, get prog() { return prog; },
-  music: Music, startRound, toggleSing, tumble, ozosnel, OZO, FEEST, SONG_FEEST, startCel, stopCel, endRound, songBeats, questionText, cancelGame, get pendingTimers() { return gameTimers.size; }, INSTRUCTION, fitScale, get voice() { return voice; }, voiceScore,
+window.__splits = { makeQuestion, checkAnswer, adapt, LEVELS, STOOMBOOT, state: st, get prog() { return prog; },
+  music: Music, startRound, tumble, ozosnel, OZO, FEEST, SONG_FEEST, startCel, stopCel, endRound, songBeats, questionText, cancelGame, get pendingTimers() { return gameTimers.size; }, INSTRUCTION, fitScale, get voice() { return voice; }, voiceScore,
   get soundOn() { return soundOn; }, get ac() { return ac; }, get outG() { return outG; },
   speech: { get active() { return vActive; } } };
 })();
