@@ -933,15 +933,7 @@ input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:d
       <svg class="sint" viewBox="0 0 200 270"><use href="#sint" width="200" height="270"/></svg>
       <svg class="shoe" viewBox="0 0 120 110"><use href="#shoe" width="120" height="110"/></svg>
     </div>
-    <div class="lyrics" id="lyrics">
-      <h3><svg viewBox="0 0 24 24"><use href="#ic-music" width="24" height="24"/></svg>Het Splitslied</h3>
-      <p class="wijs">op de wijs van ‘Sinterklaas kapoentje’</p>
-      <div class="verse" id="verse"></div>
-      <div class="lyr-foot">
-        <div class="vdots" id="vdots"></div>
-        <button class="big-btn sing-btn" id="singBtn"><svg viewBox="0 0 24 24"><use id="singIcon" href="#ic-play" width="24" height="24"/></svg><span id="singLabel">Zing mee</span></button>
-      </div>
-    </div>
+    <button class="big-btn sing-btn" id="singBtn"><svg viewBox="0 0 24 24"><use id="singIcon" href="#ic-play" width="24" height="24"/></svg><span id="singLabel">Speel het Splitslied</span></button>
   </div>
   <div class="levels">
     <button class="big-btn" id="lv1" data-lv="1"><span class="lv-label">Spelen</span>tot 5<span class="lv-stars"></span></button>
@@ -1032,15 +1024,10 @@ input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:d
       <div class="dancer horse" id="danceHorse"></div>
       <div class="dancer p2"><svg viewBox="0 0 200 240"><use href="#piet" width="200" height="240"/></svg></div>
     </div>
-    <div class="lyrics">
-      <h3><svg viewBox="0 0 24 24"><use href="#ic-music" width="24" height="24"/></svg>Het Feestlied</h3>
-      <p class="wijs">op de wijs van ‘Zie ginds komt de stoomboot’</p>
-      <div class="verse" id="cverse"></div>
-    </div>
   </div>
   <div class="end-btns">
-    <button class="big-btn white" id="singAgainBtn"><svg viewBox="0 0 24 24" style="width:1em;height:1em"><use href="#ic-play" width="24" height="24"/></svg>Nog een keer zingen</button>
-    <button class="big-btn white" id="skipBtn"><svg viewBox="0 0 24 24" style="width:1em;height:1em"><use href="#ic-stop" width="24" height="24"/></svg>Overslaan</button>
+    <button class="big-btn white" id="singAgainBtn"><svg viewBox="0 0 24 24" style="width:1em;height:1em"><use href="#ic-play" width="24" height="24"/></svg>Speel de feestmuziek</button>
+    <button class="big-btn white" id="skipBtn"><svg viewBox="0 0 24 24" style="width:1em;height:1em"><use href="#ic-stop" width="24" height="24"/></svg>Stop de muziek</button>
     <button class="big-btn" id="againBtn">Nog een keer spelen</button>
     <button class="big-btn" id="otherBtn">Tot 10</button>
   </div>
@@ -1066,10 +1053,8 @@ input,textarea{-webkit-user-select:text;user-select:text;-webkit-touch-callout:d
     apply(p === 'auto' ? (level ? PER_LEVEL[level] : START_DEFAULT) : p);
     document.querySelectorAll('#worlds .wbtn').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.world === p)));
   };
-  function speak(t) {   // read the world name aloud for non-readers (respects the game's sound toggle)
-    try { if (localStorage.getItem('sks-sound') === 'off' || !('speechSynthesis' in window)) return;
-      speechSynthesis.cancel(); const u = new SpeechSynthesisUtterance(t); u.lang = 'nl-NL';
-      const v = speechSynthesis.getVoices().find(v => /^nl/i.test(v.lang)); if (v) u.voice = v; u.rate = .95; speechSynthesis.speak(u); } catch (e) {}
+  function speak(t) {   // read the world name aloud via the game's shared speech queue (same voice, same mute); a button tap is deliberate, so it may interrupt
+    try { if (window.sksSay) window.sksSay(t, { interrupt: true }); } catch (e) {}
   }
   const SAY = { auto: 'Automatisch. Elke level een andere wereld!', snoep: 'De snoepwinkel!', pakjes: 'Pakjesavond bij de open haard!', boot: 'De stoomboot, in de nacht!' };
   document.addEventListener('DOMContentLoaded', () => {
@@ -1390,49 +1375,23 @@ const kState = { a: { shown: -1, cur: '' }, b: { shown: -1, cur: '' } };
 
 function renderVerse(cfg, v) {
   kState[cfg.id].shown = v;
+  if (!$(cfg.verseEl)) return;   // lyrics are not shown on screen any more
   $(cfg.verseEl).innerHTML = cfg.lyrics[v].map((line, l) => `<div class="line" data-l="${l}">` +
     line.map((s, k) => `<span class="syl" data-l="${l}" data-k="${k}">${s.trimEnd()}</span>${/\s$/.test(s) ? ' ' : ''}`).join('') + '</div>').join('');
   if (cfg.dotsEl) [...$(cfg.dotsEl).children].forEach((d, i) => d.classList.toggle('on', i === v));
 }
 function initLyrics() {
-  $('vdots').innerHTML = LYRICS.map((_, i) => `<button class="vdot" aria-label="Couplet ${i + 1}">${i + 1}</button>`).join('');
-  [...$('vdots').children].forEach((d, i) => d.addEventListener('click', () => { if (!(Music.mode === 'sing' && Music.song === SONG_SPLITS)) renderVerse(SONG_SPLITS, i); }));
   renderVerse(SONG_SPLITS, 0); renderVerse(SONG_FEEST, 0);
-}
-function karaokeLoop() {
-  const cfg = Music.song;
-  if (Music.mode !== 'sing' || !cfg) return;
-  const ks = kState[cfg.id];
-  const rel = ac.currentTime - Music.start;
-  let cur = null;
-  for (const e of Music.events) { if (e.t > rel + 0.03) break; if (e.syl) cur = e; }
-  if (cur) {
-    const on = rel < cur.t + cur.d - 0.03;
-    const id = `${cur.syl.v}/${cur.syl.l}/${cur.syl.k}/${on}`;
-    if (id !== ks.cur) {
-      ks.cur = id;
-      if (cur.syl.v !== ks.shown) renderVerse(cfg, cur.syl.v);
-      const { l: L, k: K } = cur.syl;
-      $(cfg.verseEl).querySelectorAll('.line').forEach((el, l) => el.classList.toggle('cur', l === L));
-      $(cfg.verseEl).querySelectorAll('.syl').forEach(el => {
-        const l = +el.dataset.l, k = +el.dataset.k;
-        el.classList.toggle('done', l < L || (l === L && k < K));
-        el.classList.toggle('on', l === L && k === K && on);
-      });
-    }
-  }
-  requestAnimationFrame(karaokeLoop);
 }
 function singUI(playing) {
   $('singIcon').setAttribute('href', playing ? '#ic-stop' : '#ic-play');
-  $('singLabel').textContent = playing ? 'Stop' : 'Zing mee';
+  $('singLabel').textContent = playing ? 'Stop de muziek' : 'Speel het Splitslied';
   if (!playing) { kState.a.cur = ''; renderVerse(SONG_SPLITS, 0); }
 }
 function startSong(cfg, onEnd) {
   voiceStop();
   kState[cfg.id].cur = ''; renderVerse(cfg, 0);
   musicPlay('sing', onEnd, cfg);
-  requestAnimationFrame(karaokeLoop);
 }
 function toggleSing() {
   ensureAudio(); if (!ac) return;
@@ -1442,7 +1401,7 @@ function toggleSing() {
 }
 
 /* ---------- speech: browser speechSynthesis, most natural Dutch voice available ---------- */
-let vActive = false, vToken = 0, voice = null;
+let vActive = false, voice = null;
 // rank voices: natural/neural/online/premium/enhanced first; nl-NL before nl-BE; avoid compact/eSpeak voices
 function voiceScore(v) {
   const lang = (v.lang || '').toLowerCase().replace('_', '-'), n = (v.name || '').toLowerCase();
@@ -1466,25 +1425,90 @@ if ('speechSynthesis' in window) {
   speechSynthesis.addEventListener ? speechSynthesis.addEventListener('voiceschanged', loadVoices) : (speechSynthesis.onvoiceschanged = loadVoices);
   let tries = 0; const poll = setInterval(() => { loadVoices(); if (++tries > 15) clearInterval(poll); }, 400);   // some browsers load voices late
 }
-function voiceStop() { vToken++; vActive = false; if ('speechSynthesis' in window) speechSynthesis.cancel(); }
-// speak one whole sentence/phrase; opts: { force, done }
-function say(text, opts = {}) {
-  voiceStop();
-  const done = opts.done || (() => {});
-  if (!soundOn || !('speechSynthesis' in window) || !text) { done(); return; }
-  if (!voice) loadVoices();
-  const tok = vToken; let ended = false;
-  const end = () => { if (ended) return; ended = true; if (tok === vToken) { vActive = false; done(); } };
+/* Speech queue. Lines are never cut off by another line: say() queues behind the line in progress (a newer
+   waiting line replaces an older waiting one). Only a deliberate action interrupts: opts.interrupt (user presses a
+   speaker / world button), voiceStop() (home, new round, mute). Long lines are split into sentences, because Chrome
+   silently stops utterances after ~15 s. A chunk ends on onend/onerror, or after a safety timeout scaled to its
+   length (iOS/Chrome sometimes never fire onend). */
+const SP = { cur: null, q: [], tok: 0, timers: [], gap: false };
+const voiceBusy = () => !!SP.cur || SP.q.length > 0 || SP.gap;
+function spSync() { vActive = voiceBusy(); }
+function spClear() { SP.timers.forEach(clearTimeout); SP.timers = []; }
+function voiceStop() {
+  SP.tok++; SP.cur = null; SP.q.length = 0; SP.gap = false; spClear(); spSync();
+  if ('speechSynthesis' in window) { try { speechSynthesis.cancel(); } catch (e) {} }
+}
+function splitSpeech(text) {
+  const out = [];
+  String(text).replace(/\s+/g, ' ').trim().split(/(?<=[.!?])\s+/).forEach(sen => {
+    if (sen.length <= 140) { out.push(sen); return; }
+    let cur = '';
+    sen.split(/(?<=[,;:])\s+/).forEach(part => {
+      if (cur && (cur + ' ' + part).length > 140) { out.push(cur); cur = part; } else cur = cur ? cur + ' ' + part : part;
+    });
+    if (cur) out.push(cur);
+  });
+  return out.filter(Boolean);
+}
+const PAUSE_BETWEEN = 350;     // short breath between two lines
+function spNext() {
+  if (SP.cur || !SP.q.length) { spSync(); return; }
+  const item = SP.cur = SP.q.shift(); item.i = 0; SP.gap = false; spSync();
+  spChunk(item, SP.tok);
+}
+function spFinish(item, tok) {
+  if (tok !== SP.tok || SP.cur !== item) return;
+  SP.cur = null; spClear();
+  SP.gap = SP.q.length > 0; spSync();
+  try { item.done(); } catch (e) {}
+  if (tok !== SP.tok) return;
+  if (SP.q.length) SP.timers.push(setTimeout(() => { if (tok === SP.tok) { SP.gap = false; spNext(); } }, PAUSE_BETWEEN));
+  else { SP.gap = false; spSync(); }
+}
+function spChunk(item, tok) {
+  if (tok !== SP.tok || SP.cur !== item) return;
+  if (item.i >= item.chunks.length) { spFinish(item, tok); return; }
+  const text = item.chunks[item.i++];
+  let ended = false, started = false, timers = [];
+  const end = () => { if (ended) return; ended = true; timers.forEach(clearTimeout); if (tok === SP.tok && SP.cur === item) spChunk(item, tok); };
   try {
+    if (!voice) loadVoices();
     const u = new SpeechSynthesisUtterance(text);
     u.lang = voice ? voice.lang : 'nl-NL'; if (voice) u.voice = voice;
     u.rate = 0.95; u.pitch = 1.0;
+    u.onstart = () => { started = true; };
     u.onend = u.onerror = end;
-    vActive = true;
     speechSynthesis.speak(u);
-    setTimeout(() => { if (!ended && tok === vToken && !speechSynthesis.speaking && !speechSynthesis.pending) end(); }, 1500);  // no voice / no events
-    setTimeout(end, 3000 + text.length * 90);
+    // no voice / no events at all: give up on this chunk if nothing ever started
+    timers.push(setTimeout(() => { if (!started && !speechSynthesis.speaking && !speechSynthesis.pending) end(); }, 2000));
+    // onend never fired (iOS/Chrome): safety timeout scaled to the text length
+    timers.push(setTimeout(end, 3000 + text.length * 140));
+    SP.timers.push(...timers);
   } catch (e) { end(); }
+}
+// say one line. opts: { interrupt: stop whatever is being said first (deliberate user action), done: callback after the last word }
+function say(text, opts = {}) {
+  const done = opts.done || (() => {});
+  if (opts.interrupt) voiceStop();
+  if (!soundOn || !('speechSynthesis' in window) || !text) { done(); return; }
+  if (!voice) loadVoices();
+  const item = { chunks: splitSpeech(text), done, i: 0 };
+  if (!item.chunks.length) { done(); return; }
+  // a line is in progress: never cut it off; the newest waiting line replaces an older waiting one
+  if (SP.cur || SP.gap) { SP.q.splice(0).forEach(o => { try { o.done(); } catch (e) {} }); }
+  SP.q.push(item); spSync();
+  if (!SP.cur && !SP.gap) spNext();
+}
+window.sksSay = say;
+// run fn after at least `min` ms AND after the speech has really finished (+ a short pause if we had to wait for it)
+function afterSpeech(fn, min = 0, pause = 450) {
+  const t0 = performance.now(); let waited = false;
+  const check = () => {
+    if (performance.now() - t0 < min) { later(check, Math.max(30, min - (performance.now() - t0))); return; }
+    if (voiceBusy()) { waited = true; later(check, 100); return; }
+    if (waited) later(fn, pause); else fn();
+  };
+  later(check, min);
 }
 const INSTRUCTION = 'Tik op het goede getal.';
 function questionText(q) {
@@ -1736,18 +1760,18 @@ function onAnswer(n, btn) {
     st.idx++;
     renderDots(); moveBoat();
     $('hintBtn').style.visibility = 'hidden';
-    later(() => { st.idx >= ROUND ? endRound() : newQuestion(); }, up ? 3300 : 2800);
+    afterSpeech(() => { st.idx >= ROUND ? endRound() : newQuestion(); }, up ? 3300 : 2800);
   } else {
     st.attempts++;
     btn.classList.remove('wrong'); void btn.offsetWidth; btn.classList.add('wrong');
     tumble();
     setBubble(`${pick(TRY)} ${eqHTML(q, false)}`, 'try');
     say(st.attempts >= 2 ? 'Probeer nog eens. Tel maar mee!' : 'Bijna! Probeer nog eens.');
-    if (st.attempts >= 2) later(showHint, 2600);
+    if (st.attempts >= 2) afterSpeech(() => showHint(false), 2600);
   }
 }
 
-function showHint() {
+function showHint(manual) {
   if (st.hint || st.busy) return;
   st.hint = true; ensureAudio();
   const q = st.q;
@@ -1756,7 +1780,7 @@ function showHint() {
   const isKnown = i => q.missing === 'right' ? i < q.known : i >= q.total - q.known;
   cells.forEach((c, i) => { if (isKnown(i)) c.classList.add('gone'); });
   const rest = cells.filter((c, i) => !isKnown(i));
-  say(rest.length ? 'Tel maar mee: ' + rest.map((_, j) => j + 1).join(', ') + '.' : 'Er zijn er geen meer over!', { force: true });
+  say(rest.length ? 'Tel maar mee: ' + rest.map((_, j) => j + 1).join(', ') + '.' : 'Er zijn er geen meer over!', { interrupt: !!manual });
   const step = rest.length > 10 ? 520 : 680;
   rest.forEach((c, j) => later(() => {
     if (st.q !== q || st.busy) return;
@@ -1793,16 +1817,15 @@ function endRound() {
   let txt = (pname ? 'Hoera, ' + pname + '! ' : 'Hoera! ') + 'De stoomboot is in Nederland! ' + msg;
   if (newLevel) txt += ` Probeer nu eens ${LEVELS[newLevel].name}!`;
   else if (st.level === prog.unlocked && st.level < 3) txt += ` Met ${UNLOCK_STARS} gouden sterren gaat ${LEVELS[st.level + 1].name} open.`;
-  if (musicOn) txt += fest ? ' Wauw! Zing je mee met het feestlied?' : ' Zing je mee met het feestlied?';
   const tok = ++celToken;
   later(() => {
     if (tok !== celToken) return;
-    say(txt, { done: () => { if (tok === celToken && soundOn && musicOn && $('end').classList.contains('active')) startCel(); } });
+    say(txt, { done: () => { later(() => { if (tok === celToken && soundOn && musicOn && $('end').classList.contains('active')) startCel(); }, 500); } });
   }, 1700);
 }
 function celUI(playing) {
   $('skipBtn').style.display = playing ? '' : 'none';
-  $('singAgainBtn').lastChild.textContent = kState.b.played ? 'Nog een keer zingen' : 'Zing het feestlied';
+  $('singAgainBtn').lastChild.textContent = kState.b.played ? 'Speel nog een keer' : 'Speel de feestmuziek';
 }
 function startCel() {
   ++celToken; kState.b.played = true;
@@ -1855,7 +1878,7 @@ function levelClick(lv) {
   if (lv > prog.unlocked) {
     ensureAudio(); b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope');
     tone(330, 0, 0.15, 'sine', 0.1);
-    say(`Deze is nog op slot. Haal eerst ${UNLOCK_STARS} gouden sterren bij ${LEVELS[lv - 1].name}.`, { force: true });
+    say(`Deze is nog op slot. Haal eerst ${UNLOCK_STARS} gouden sterren bij ${LEVELS[lv - 1].name}.`, { interrupt: true });
     return;
   }
   startRound(lv);
@@ -1918,8 +1941,8 @@ $('otherBtn').addEventListener('click', () => {
   if (g && g !== 'menu') startRound(+g); else { renderStart(); show('start'); }
 });
 $('homeBtn').addEventListener('click', () => { cancelGame(); renderStart(); show('start'); });
-$('sayBtn').addEventListener('click', () => { ensureAudio(); if (st.q) say(questionText(st.q) + ' ' + INSTRUCTION, { force: true }); });
-$('hintBtn').addEventListener('click', () => { SFX.tap(); showHint(); });
+$('sayBtn').addEventListener('click', () => { ensureAudio(); if (st.q) say(questionText(st.q) + ' ' + INSTRUCTION, { interrupt: true }); });
+$('hintBtn').addEventListener('click', () => { SFX.tap(); showHint(true); });
 function toggleSound() {
   soundOn = !soundOn; localStorage.setItem('sks-sound', soundOn ? 'on' : 'off');
   ensureAudio();
