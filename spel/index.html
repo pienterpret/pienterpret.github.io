@@ -1150,36 +1150,8 @@ function ensureAudio() {
       outG = ac.createGain(); outG.gain.value = soundOn ? 1 : 0; outG.connect(ac.destination);
       master = ac.createGain(); master.gain.value = 0.5; master.connect(outG);
     }
-    if (ac.state !== 'running') { const r = ac.resume(); if (r && r.catch) r.catch(() => {}); }   // 'suspended' or iOS 'interrupted'
+    if (ac.state === 'suspended') ac.resume();
   } catch (e) { ac = null; }
-}
-/* ---- mobile audio unlock (iOS Safari / Android Chrome) ----
-   Web Audio and speechSynthesis only start inside a real user gesture, and iOS wants touchend/click (not touchstart).
-   The iPhone silent switch mutes Web Audio unless the page is on the 'playback' audio session, or an HTML <audio> element plays. */
-try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {}
-const SILENT_WAV = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YSADAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgA==';
-let silentEl = null, speechUnlocked = false, bufUnlocked = false;
-function keepSilentAudio() {   // plays a silent looping <audio>: lifts Web Audio above the iOS silent switch
-  try {
-    if (!silentEl) {
-      silentEl = new Audio(SILENT_WAV); silentEl.loop = true; silentEl.preload = 'auto';
-      silentEl.setAttribute('playsinline', ''); silentEl.setAttribute('aria-hidden', 'true'); silentEl.volume = 1;
-    }
-    if (soundOn && silentEl.paused) { const r = silentEl.play(); if (r && r.catch) r.catch(() => {}); }
-    else if (!soundOn && !silentEl.paused) silentEl.pause();
-  } catch (e) {}
-}
-function unlockAudio() {      // call synchronously from a user gesture; safe to call on every tap
-  try { if (navigator.audioSession && navigator.audioSession.type !== 'playback') navigator.audioSession.type = 'playback'; } catch (e) {}
-  ensureAudio();
-  if (ac && !bufUnlocked) {   // classic unlock: start a 1-sample silent buffer inside the gesture
-    try { const b = ac.createBuffer(1, 1, 22050), src = ac.createBufferSource(); src.buffer = b; src.connect(ac.destination); src.start(0); bufUnlocked = true; } catch (e) {}
-  }
-  keepSilentAudio();
-  if (!speechUnlocked && soundOn && 'speechSynthesis' in window) {   // iOS needs a first speak() inside a gesture
-    speechUnlocked = true;
-    try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.lang = 'nl-NL'; speechSynthesis.speak(u); } catch (e) {}
-  }
 }
 function tone(freq, start, dur, type = 'triangle', vol = 0.25, toFreq) {
   if (!ac || !soundOn) return;
@@ -1344,11 +1316,7 @@ function musicTick() {
   if (Math.abs(target - Music.cur) > 1e-4) { Music.gain.gain.setTargetAtTime(target, now, Music.cur < 0 ? 0.4 : 0.12); Music.cur = target; }
   if (!Music.loop && Music.idx >= Music.events.length && now > Music.start + Music.len) { const cb = Music.onEnd; musicStop(); if (cb) cb(); }
 }
-document.addEventListener('visibilitychange', () => {
-  if (!ac) return;
-  if (document.hidden) { if (silentEl) silentEl.pause(); ac.suspend(); }
-  else { const r = ac.resume(); if (r && r.catch) r.catch(() => {}); keepSilentAudio(); }   // iOS may refuse until the next tap, which unlockAudio() handles
-});
+document.addEventListener('visibilitychange', () => { if (!ac) return; document.hidden ? ac.suspend() : ac.resume(); });
 
 /* ---------- songs with original lyrics ---------- */
 // Het Feestlied — melody 'Zie ginds komt de stoomboot' (11 / 12 / 11 / 11 syllables)
@@ -1921,7 +1889,6 @@ $('hintBtn').addEventListener('click', () => { SFX.tap(); showHint(true); });
 function toggleSound() {
   soundOn = !soundOn; localStorage.setItem('sks-sound', soundOn ? 'on' : 'off');
   ensureAudio();
-  keepSilentAudio();
   if (outG) { outG.gain.cancelScheduledValues(ac.currentTime); outG.gain.setValueAtTime(soundOn ? 1 : 0, ac.currentTime); }
   if (!soundOn) { voiceStop(); try { speechSynthesis.cancel(); } catch (e) {} }
   updateSoundIcon();
@@ -1929,8 +1896,13 @@ function toggleSound() {
 }
 $('soundBtn').addEventListener('click', toggleSound);
 $('soundBtnStart').addEventListener('click', e => { e.stopPropagation(); toggleSound(); });
-// unlock on every kind of gesture, and again on each tap while the context is not running (iOS may suspend it any time)
-['touchend', 'pointerup', 'click', 'keydown'].forEach(t => document.addEventListener(t, () => { unlockAudio(); }, { capture: true, passive: true }));
+// the audio context may only start after the first tap (autoplay rules)
+let firstGesture = true;
+const onFirst = e => {
+  if (!firstGesture) return; firstGesture = false; ensureAudio();
+};
+document.addEventListener('pointerdown', onFirst, true);
+document.addEventListener('keydown', onFirst, true);
 // scale caps up on large screens (digibord, 4K); phones/tablets stay at --z = 1
 function fitScale() {
   const z = Math.max(1, Math.min(innerWidth / 1440, innerHeight / 900, 3));
@@ -1956,7 +1928,7 @@ $('flags').innerHTML = Array.from({ length: 16 }, (_, i) => { const x = i * 38 +
 // test hook
 window.__splits = { makeQuestion, checkAnswer, adapt, LEVELS, STOOMBOOT, state: st, get prog() { return prog; },
   music: Music, startRound, tumble, ozosnel, OZO, FEEST, SONG_FEEST, startCel, stopCel, endRound, songBeats, questionText, cancelGame, get pendingTimers() { return gameTimers.size; }, INSTRUCTION, fitScale, get voice() { return voice; }, voiceScore,
-  get soundOn() { return soundOn; }, get unlock() { return { state: ac && ac.state, silentPlaying: !!(silentEl && !silentEl.paused), speechUnlocked, bufUnlocked }; }, get ac() { return ac; }, get outG() { return outG; },
+  get soundOn() { return soundOn; }, get ac() { return ac; }, get outG() { return outG; },
   speech: { get active() { return vActive; } } };
 })();
 </script>
