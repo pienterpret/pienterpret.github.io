@@ -1896,13 +1896,11 @@ function toggleSound() {
 }
 $('soundBtn').addEventListener('click', toggleSound);
 $('soundBtnStart').addEventListener('click', e => { e.stopPropagation(); toggleSound(); });
-// the audio context may only start after the first tap (autoplay rules)
-let firstGesture = true;
-const onFirst = e => {
-  if (!firstGesture) return; firstGesture = false; ensureAudio();
-};
-document.addEventListener('pointerdown', onFirst, true);
-document.addEventListener('keydown', onFirst, true);
+// The audio context may only start inside a real tap/click/key press (autoplay rules). Create it and resume it
+// synchronously in EVERY kind of gesture (mouse, touch, pen, keyboard): ensureAudio() is a no-op once it is running,
+// and each button handler also calls it itself before making its sounds. (touchend/click matter for iOS Safari/Chrome,
+// which do not accept pointerdown/touchstart as the unlocking gesture.)
+['pointerdown', 'touchend', 'click', 'keydown'].forEach(t => document.addEventListener(t, ensureAudio, { capture: true, passive: true }));
 // scale caps up on large screens (digibord, 4K); phones/tablets stay at --z = 1
 function fitScale() {
   const z = Math.max(1, Math.min(innerWidth / 1440, innerHeight / 900, 3));

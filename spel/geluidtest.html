@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geluidtest</title>
+<style>
+body{font:17px/1.4 system-ui,sans-serif;max-width:640px;margin:20px auto;padding:0 14px;color:#222}
+button{font:inherit;font-weight:700;padding:14px 18px;margin:6px 6px 6px 0;border-radius:12px;border:2px solid #c8102e;background:#fff;color:#c8102e;cursor:pointer}
+button:active{background:#c8102e;color:#fff}
+pre{background:#f4f4f4;padding:10px;border-radius:8px;white-space:pre-wrap;font-size:14px}
+h1{font-size:22px}
+</style></head><body>
+<h1>Geluidtest</h1>
+<p>Zet het volume van je computer/telefoon aan. Druk op de knoppen en kijk of je iets hoort. Stuur een screenshot van deze pagina.</p>
+<button id="b1">1. Piep (WebAudio)</button>
+<button id="b2">2. Spraak</button>
+<button id="b3">3. Piep (audio-element)</button>
+<pre id="info"></pre>
+<pre id="log"></pre>
+<script>
+const $=id=>document.getElementById(id), logEl=$('log'), t0=performance.now();
+const log=m=>{ logEl.textContent=((performance.now()-t0)/1000).toFixed(2)+'s  '+m+'\n'+logEl.textContent; };
+let ac=null;
+function info(){
+  let v=[]; try{ v=speechSynthesis.getVoices(); }catch(e){}
+  const nl=v.filter(x=>/^nl/i.test(x.lang)).map(x=>x.name+' ('+x.lang+')');
+  $('info').textContent=
+   'Browser: '+navigator.userAgent+'\n'+
+   'Adres: '+location.origin+'\n'+
+   'AudioContext: '+(window.AudioContext||window.webkitAudioContext?'ja':'NEE')+'   toestand: '+(ac?ac.state:'(nog niet gemaakt)')+'\n'+
+   'Spraak: '+('speechSynthesis' in window?'ja':'NEE')+'   stemmen: '+v.length+'   Nederlandse: '+(nl.join(', ')||'geen')+'\n'+
+   'Geluid in spel aan/uit (sks-sound): '+(localStorage.getItem('sks-sound')||'(niet gezet = aan)')+'\n'+
+   'Tabblad zichtbaar: '+document.visibilityState;
+}
+function ensure(){
+  if(!ac){ const C=window.AudioContext||window.webkitAudioContext; ac=new C(); log('AudioContext gemaakt, toestand: '+ac.state); }
+  if(ac.state!=='running'){ const r=ac.resume(); log('resume() aangeroepen, toestand nu: '+ac.state); if(r&&r.then) r.then(()=>{log('resume klaar, toestand: '+ac.state);info();},e=>log('resume mislukt: '+e)); }
+  ac.onstatechange=()=>{log('toestand veranderd: '+ac.state);info();};
+}
+$('b1').onclick=()=>{ try{
+  ensure();
+  const o=ac.createOscillator(), g=ac.createGain(); o.frequency.value=660; o.connect(g); g.connect(ac.destination);
+  g.gain.setValueAtTime(0.0001,ac.currentTime); g.gain.exponentialRampToValueAtTime(0.4,ac.currentTime+0.02); g.gain.exponentialRampToValueAtTime(0.0001,ac.currentTime+0.6);
+  o.start(); o.stop(ac.currentTime+0.7); log('piep gestart (toestand '+ac.state+'). Hoor je een toon van een halve seconde?');
+ }catch(e){ log('FOUT: '+e); } info(); };
+$('b2').onclick=()=>{ try{
+  const u=new SpeechSynthesisUtterance('Hallo! Dit is een test van de stem.'); u.lang='nl-NL';
+  const nl=speechSynthesis.getVoices().find(v=>/^nl/i.test(v.lang)); if(nl) u.voice=nl;
+  u.onstart=()=>log('spraak: begonnen'); u.onend=()=>log('spraak: klaar'); u.onerror=e=>log('spraak: FOUT '+e.error);
+  speechSynthesis.cancel(); speechSynthesis.speak(u); log('spraak aangevraagd (stem: '+(nl?nl.name:'standaard')+')');
+ }catch(e){ log('FOUT: '+e); } info(); };
+$('b3').onclick=()=>{ try{
+  // 0,5 s sinus 660 Hz als WAV
+  const sr=8000,n=sr/2,buf=new ArrayBuffer(44+n*2),dv=new DataView(buf),w=(o,s)=>{for(let i=0;i<s.length;i++)dv.setUint8(o+i,s.charCodeAt(i));};
+  w(0,'RIFF');dv.setUint32(4,36+n*2,true);w(8,'WAVEfmt ');dv.setUint32(16,16,true);dv.setUint16(20,1,true);dv.setUint16(22,1,true);dv.setUint32(24,sr,true);dv.setUint32(28,sr*2,true);dv.setUint16(32,2,true);dv.setUint16(34,16,true);w(36,'data');dv.setUint32(40,n*2,true);
+  for(let i=0;i<n;i++)dv.setInt16(44+i*2,Math.sin(2*Math.PI*660*i/sr)*12000*Math.min(1,(n-i)/800),true);
+  const a=new Audio(URL.createObjectURL(new Blob([buf],{type:'audio/wav'})));
+  a.play().then(()=>log('audio-element speelt'),e=>log('audio-element FOUT: '+e));
+ }catch(e){ log('FOUT: '+e); } };
+try{ speechSynthesis.onvoiceschanged=info; }catch(e){}
+info(); setInterval(info,1500);
+</script></body></html>
